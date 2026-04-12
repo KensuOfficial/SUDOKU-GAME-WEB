@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+   <title>Sudoku Surprise Reveal</title>
+   <style>
+      :root {
+         --primary: #6c5ce7;
+         --bg: #f8f9fc;
+         --cell: #ffffff;
+         --border: #34495e;
+         --gift-color: #ff7675;
+      }
+
+      body {
+         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         background-color: var(--bg);
+         display: flex;
+         flex-direction: column;
+         align-items: center;
+         margin: 0;
+         padding: 20px;
+         touch-action: manipulation;
+         /* Solves some iOS tapping lag */
+      }
+
+      h1 {
+         color: var(--border);
+         margin-bottom: 10px;
+         font-weight: 300;
+      }
+
+      /* --- Sudoku Grid --- */
+      #grid {
+         display: grid;
+         grid-template-columns: repeat(9, 1fr);
+         border: 3px solid var(--border);
+         width: 100%;
+         max-width: 450px;
+         aspect-ratio: 1 / 1;
+         /* Maintains square ratio */
+         background-color: var(--border);
+         gap: 1px;
+         position: relative;
+         /* Container for the overlay photo */
+      }
+
+      .cell {
+         background: var(--cell);
+         display: flex;
+         align-items: center;
+         justify-content: center;
+         font-size: 1.2rem;
+         font-weight: bold;
+         cursor: pointer;
+         -webkit-tap-highlight-color: transparent;
+      }
+
+      .cell.selected {
+         background-color: #d1d8ff;
+      }
+
+      .cell.fixed {
+         color: #2d3436;
+         background-color: #f8f9fa;
+      }
+
+      .cell.user-val {
+         color: var(--primary);
+      }
+
+      /* Borders for 3x3 subgrids */
+      .cell:nth-child(3n) {
+         border-right: 2px solid var(--border);
+      }
+
+      .cell:nth-child(9n) {
+         border-right: none;
+      }
+
+      .row-border {
+         border-bottom: 2px solid var(--border);
+      }
+
+      /* --- Surprise Photo Overlay (The Gift) --- */
+      #photoOverlay {
+         display: none;
+         /* Initially hidden */
+         position: absolute;
+         top: 0;
+         left: 0;
+         width: 100%;
+         height: 100%;
+         background-image: url('b61876f5-7db3-4982-9bcf-e22a214f6eac.jpg');
+         /* REPLACE THIS URL */
+         background-size: cover;
+         background-position: center;
+         z-index: 10;
+
+         /* The critical blur settings for the surprise */
+         filter: blur(20px);
+         /* Initially blurred when solved */
+         opacity: 0.95;
+         /* Slight transparency while blurred */
+
+         /* Smooth transition definition */
+         transition: filter 3s ease-in-out, opacity 1s ease-out;
+      }
+
+      /* State applied by JS when Gift Button is pressed */
+      #photoOverlay.reveal {
+         filter: blur(0px);
+         /* Clears the blur */
+         opacity: 1;
+      }
+
+      /* --- Number Picker (iPad Compatible) --- */
+      #picker {
+         display: grid;
+         grid-template-columns: repeat(5, 1fr);
+         gap: 10px;
+         margin-top: 25px;
+         width: 100%;
+         max-width: 400px;
+      }
+
+      .num-btn {
+         padding: 15px;
+         font-size: 1.5rem;
+         border: none;
+         border-radius: 8px;
+         background: var(--primary);
+         color: white;
+         cursor: pointer;
+         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      .num-btn:active {
+         transform: scale(0.95);
+         background: #5542cf;
+      }
+
+      /* --- Gift Reveal Button --- */
+      #giftButton {
+         display: none;
+         /* Initially hidden */
+         background: var(--gift-color);
+         color: white;
+         border: none;
+         padding: 20px 40px;
+         font-size: 1.5rem;
+         border-radius: 50px;
+         cursor: pointer;
+         margin-top: 30px;
+         box-shadow: 0 10px 20px rgba(255, 118, 117, 0.3);
+         animation: pulse 1.5s infinite;
+         /* Gentle pulsating hint */
+      }
+
+      @keyframes pulse {
+         0% {
+            box-shadow: 0 10px 20px rgba(255, 118, 117, 0.3);
+         }
+
+         50% {
+            box-shadow: 0 10px 25px rgba(255, 118, 117, 0.6);
+         }
+
+         100% {
+            box-shadow: 0 10px 20px rgba(255, 118, 117, 0.3);
+         }
+      }
+
+      /* --- Message/Paragraph Area --- */
+      #messageArea {
+         display: none;
+         margin-top: 30px;
+         padding: 25px;
+         background: white;
+         border-radius: 15px;
+         max-width: 400px;
+         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+         animation: fadeIn 1s ease-in;
+      }
+
+      @keyframes fadeIn {
+         from {
+            opacity: 0;
+         }
+
+         to {
+            opacity: 1;
+         }
+      }
+   </style>
+</head>
+
+<body>
+
+   <h1>Sudoku Challenge</h1>
+   <div id="grid">
+      <div id="photoOverlay"></div>
+   </div>
+
+   <div id="picker">
+      <button class="num-btn" onclick="inputValue(1)">1</button>
+      <button class="num-btn" onclick="inputValue(2)">2</button>
+      <button class="num-btn" onclick="inputValue(3)">3</button>
+      <button class="num-btn" onclick="inputValue(4)">4</button>
+      <button class="num-btn" onclick="inputValue(5)">5</button>
+      <button class="num-btn" onclick="inputValue(6)">6</button>
+      <button class="num-btn" onclick="inputValue(7)">7</button>
+      <button class="num-btn" onclick="inputValue(8)">8</button>
+      <button class="num-btn" onclick="inputValue(9)">9</button>
+      <button class="num-btn" style="background:#636e72" onclick="inputValue(0)">✖</button>
+   </div>
+
+   <button id="giftButton">🎁 Open Your Gift!</button>
+
+   <div id="messageArea">
+      <p id="messageText">
+         CONGRATULATIONS, YOU SOLVED IT!
+         <br><br>
+         Hi,
+
+
+
+
+         haha I guess this is it. We have our own unsaid thoughts and feelings and I've shown you some of mine, but I guess it
+         will never be reciprocated since this wont work if you're not communicating your feelings and thoughts. Its like you are
+         playing a game, a chess specifically that you always protecting yourself and treat relationships as a board game instead
+         of a human connection that I always thought we had. Is this a game for you? I know that I don't have rights since we're
+         just friends according to you. But do I always have to be considerate and understands you? Have you considered my
+         feelings? No disrespect, but are you playing with me and just being affectionate with me personally so you won't hurt my
+         feelings? haha so stupid of me. Thats why you always win in chess. I don't need answers cuz you might've having a hard
+         time rn and just you reading it is fine with me, Im choosing to step away now. I hope you find your peace and happiness
+         and please be honest on what you feel on your next and also I hope you get lucky now, so goodluck with your adventure.
+         Please keep it between us, I don't want things to become awkward with my cm. Thankyou for the short moments and memories
+         I really appreciated it. And also haha congrats on your accounting I known you will win. So for my consequence is this
+         🫶.
+         <br><br>
+      </p>
+   </div>
+
+   <audio id="bgMusic" loop>
+      <source src="(Audio) 7ee760d6-83a6-47d9-a802-f132664bc977.m4a" type="audio/mpeg">
+   </audio>
+
+   <script>
+      // Static Puzzle Solution
+      const solution = [
+         5, 3, 4, 6, 7, 8, 9, 1, 2,
+         6, 7, 2, 1, 9, 5, 3, 4, 8,
+         1, 9, 8, 3, 4, 2, 5, 6, 7,
+         8, 5, 9, 7, 6, 1, 4, 2, 3,
+         4, 2, 6, 8, 5, 3, 7, 9, 1,
+         7, 1, 3, 9, 2, 4, 8, 5, 6,
+         9, 6, 1, 5, 3, 7, 2, 8, 4,
+         2, 8, 7, 4, 1, 9, 6, 3, 5,
+         3, 4, 5, 2, 8, 6, 1, 7, 9
+      ];
+
+      // Numbers already present on the board
+      const initialBoard = [
+         5, 3, 0, 0, 7, 0, 0, 0, 0,
+         6, 0, 0, 1, 9, 5, 0, 0, 0,
+         0, 9, 8, 0, 0, 0, 0, 6, 0,
+         8, 0, 0, 0, 6, 0, 0, 0, 3,
+         4, 0, 0, 8, 0, 3, 0, 0, 1,
+         7, 0, 0, 0, 2, 0, 0, 0, 6,
+         0, 6, 0, 0, 0, 0, 2, 8, 0,
+         0, 0, 0, 4, 1, 9, 0, 0, 5,
+         0, 0, 0, 0, 8, 0, 0, 7, 9
+      ];
+
+      let currentBoard = [...initialBoard];
+      let selectedIndex = -1;
+
+      // Element Selectors
+      const gridEl = document.getElementById('grid');
+      const photoOverlay = document.getElementById('photoOverlay');
+      const giftButton = document.getElementById('giftButton');
+      const messageArea = document.getElementById('messageArea');
+      const bgMusic = document.getElementById('bgMusic');
+
+      // --- 1. Initialize Board ---
+      function initBoard() {
+         // Keep the photoOverlay div, but clear other cells
+         const overlay = document.getElementById('photoOverlay');
+         gridEl.innerHTML = '';
+         gridEl.appendChild(overlay);
+
+         for (let i = 0; i < 81; i++) {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+
+            // Subgrid thick borders
+            if (Math.floor(i / 9) === 2 || Math.floor(i / 9) === 5) {
+               cell.classList.add('row-border');
+            }
+
+            if (initialBoard[i] !== 0) {
+               cell.innerText = initialBoard[i];
+               cell.classList.add('fixed');
+            } else {
+               cell.onclick = () => selectCell(i);
+            }
+            gridEl.appendChild(cell);
+         }
+      }
+
+      // --- 2. Input Logic ---
+      function selectCell(index) {
+         selectedIndex = index;
+         // Clear prior selection
+         document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected'));
+         gridEl.children[index + 1].classList.add('selected'); // +1 to avoid photoOverlay child
+      }
+
+      function inputValue(num) {
+         // Validate input: requires selection & cannot be a fixed cell
+         if (selectedIndex === -1 || initialBoard[selectedIndex] !== 0) return;
+
+         const cell = gridEl.children[selectedIndex + 1]; // +1 because overlay is first child
+
+         if (num === 0) { // Eraser
+            cell.innerText = '';
+            cell.classList.remove('user-val');
+            currentBoard[selectedIndex] = 0;
+         } else {
+            cell.innerText = num;
+            cell.classList.add('user-val');
+            currentBoard[selectedIndex] = num;
+         }
+
+         // Check if solved after every input
+         checkWin();
+      }
+
+      // --- 3. Winning Logic ---
+      function checkWin() {
+         const isSolved = currentBoard.every((val, index) => val === solution[index]);
+
+         if (isSolved) {
+            // Puzzle complete: Show the blurred photo & the Gift Button
+            photoOverlay.style.display = 'block'; // Makes the overlay visible
+            giftButton.style.display = 'block'; // Shows the gift button
+
+            // Optional: Gentle scroll hint on mobile
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+         }
+      }
+
+      // --- 4. The Final Surprise Reveal ---
+      giftButton.onclick = () => {
+         // 1. Reveal the paragraph
+         messageArea.style.display = 'block';
+
+         // 2. Clear the blur slowly (CSS handles the timing)
+         photoOverlay.classList.add('reveal');
+
+         // 3. Play music (required interaction for browser policy)
+         bgMusic.play().catch(e => console.log("Audio play blocked until interaction."));
+
+         // 4. Hide the button itself
+         giftButton.style.display = 'none';
+      };
+
+      // Start the game
+      initBoard();
+   </script>
+</body>
+
+</html>
